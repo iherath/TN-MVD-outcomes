@@ -1,0 +1,17 @@
+# Data files — not tracked
+*.csv
+*.xlsx
+
+# MCD Research file
+MCD Research
+
+# Python / Jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.egg-info/
+dist/
+build/
+
+# macOS
+.DS_Store
