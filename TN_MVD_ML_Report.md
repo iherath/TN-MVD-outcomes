@@ -289,7 +289,7 @@ Three strategies were evaluated and compared:
 
 ### 7.4 Models Trained
 
-Eight classifiers plus a dummy baseline were evaluated:
+Nine classifiers plus a dummy baseline were evaluated:
 
 | Model | Key Hyperparameter Defaults | Imbalance Strategy |
 |---|---|---|
@@ -302,8 +302,11 @@ Eight classifiers plus a dummy baseline were evaluated:
 | LightGBM | n_estimators=200, learning_rate=0.05 | is_unbalance=True |
 | SVM (RBF kernel) | C=1.0, gamma='scale' | class_weight='balanced' |
 | K-Nearest Neighbours | k=7, distance-weighted | None |
+| MLP (3-layer) | hidden_layer_sizes=(64,32,16), relu, early_stopping=True | SMOTE variant only† |
 
-SMOTE variants were additionally evaluated for the top three tree-based models.
+†MLPClassifier does not support `class_weight`. Class imbalance is addressed for the MLP via a dedicated SMOTE variant evaluated separately. The base MLP uses `early_stopping=True` with a 10% validation split for built-in regularisation.
+
+SMOTE variants were additionally evaluated for XGBoost, LightGBM, Random Forest, and MLP (3-layer).
 
 ### 7.5 Hyperparameter Tuning
 
@@ -326,6 +329,13 @@ The top three CV performers (XGBoost, LightGBM, Random Forest) underwent **Rando
 - `n_estimators`: 100, 200, 300
 - `max_depth`: 5, 7, 10, None
 - `min_samples_split`, `min_samples_leaf`, `max_features`
+
+**MLP (3-layer):**
+- `hidden_layer_sizes`: (64,32,16), (128,64,32), (100,50,25), (64,64,64)
+- `activation`: relu, tanh
+- `alpha` (L2 regularisation): 0.0001, 0.001, 0.01
+- `learning_rate_init`: 0.001, 0.01
+- `early_stopping`: always True; 30 random iterations
 
 ---
 
@@ -415,11 +425,14 @@ For this analysis, we recommend exploring the **0.15–0.20 range** as a practic
 | LightGBM | 0.542 ± 0.136 | — | — |
 | **XGBoost** | **0.554 ± 0.103** | — | — |
 | LightGBM + SMOTE | **0.603 ± 0.085** | — | — |
+| MLP (3-layer) | *— (re-run notebook)* | — | — |
+| MLP (3-layer) + SMOTE | *— (re-run notebook)* | — | — |
 
 After tuning:
 - XGBoost (tuned): **CV AUC = 0.571**
 - LightGBM (tuned): **CV AUC = 0.581**
 - Random Forest (tuned): **CV AUC = 0.547**
+- MLP (3-layer, tuned): *— (re-run notebook)*
 
 The high standard deviations (±0.08–0.15) reflect that each validation fold contains only ~10 minority-class cases — too few for a stable estimate in any single fold. The cross-validation AUC should be interpreted as showing a direction of difference between models, not as a precise performance estimate.
 
@@ -442,6 +455,7 @@ The high standard deviations (±0.08–0.15) reflect that each validation fold c
 | Dummy Classifier | 0.500 | 0.200 | 0.000 | 1.000 | 0.000 | — |
 | Logistic Regression | 0.426 | 0.193 | 0.308 | 0.615 | 0.216 | 0.167 |
 | Decision Tree | 0.408 | 0.180 | 0.231 | 0.731 | 0.200 | 0.176 |
+| MLP (3-layer) Tuned | *— (re-run)* | — | — | — | — | — |
 
 *\*Zero sensitivity at default threshold of 0.50; see threshold analysis below.*
 
@@ -554,7 +568,7 @@ This is a candidate for prospective investigation but should not be overinterpre
 
 ### 10.3 Consistency Across Models
 
-Features that appear important across multiple models (XGBoost SHAP, Random Forest SHAP, and permutation importance for all three top models) are more credible signals. The most consistent features across all three analyses were `duration_months`, `age_surgery`, and `nvc_intraop` — all of which have established clinical precedent.
+Features that appear important across multiple models (XGBoost SHAP, Random Forest SHAP, and permutation importance for all top models) are more credible signals. The most consistent features across all analyses were `duration_months`, `age_surgery`, and `nvc_intraop` — all of which have established clinical precedent. Permutation importance for the tuned MLP (3-layer) provides an additional non-tree reference point: features that rank highly in both tree-based SHAP and MLP permutation importance are the most robustly supported predictors, independent of the inductive bias of any single model family.
 
 ![Figure 14: Permutation importance for XGBoost, Random Forest, and LightGBM (left to right) — each bar shows the mean decrease in AUC-ROC when that feature's values are randomly shuffled on the test set (error bars show ±1 SD across 20 repeats). A large drop means the model relies heavily on that feature; near-zero means the feature contributes little.](./permutation_importance.png)
 
