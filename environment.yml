@@ -1,0 +1,19 @@
+name: tn-mvd
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pandas
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - xgboost
+  - lightgbm
+  - jupyter
+  - ipykernel
+  - pip:
+    - imbalanced-learn
+    - shap

@@ -155,8 +155,8 @@ The target is **imbalanced at approximately 80:20** (259 successes : 63 failures
 
 The categorical failure rate plots reveal several features with notably different failure rates from the overall 19.6% baseline:
 
-- **Subtype:** Concomitant Pain patients have visibly higher failure rates than Paroxysmal — consistent with the TN literature, where atypical TN has significantly worse surgical outcomes.
-- **Vessel type (intraoperative):** Arterial-only compression tends toward lower failure rates than venous or no-compression, consistent with the hypothesis that pure arterial compression represents the most "surgically addressable" mechanism.
+- **Subtype:** Concomitant Pain patients have a slightly *lower* observed failure rate (16.7%) than Paroxysmal (20.0%) in this dataset. This runs counter to the broader TN literature, where atypical/concomitant pain is generally associated with worse surgical outcomes; the small Concomitant Pain group (n=42) limits statistical interpretation.
+- **Vessel type (intraoperative):** Arterial-only compression shows a *higher* failure rate (21.4%) than mixed Arterial+Venous (14.0%) or Venous-only (12.9%). This is counterintuitive relative to the common hypothesis that pure arterial compression is the most "surgically addressable" mechanism, and may reflect confounding — arterial compression is by far the most common finding (n=234) and thus captures the broadest mix of disease severity.
 - **Surgical indication:** Patients operated for medication intolerance (rather than medication failure) may represent different disease biology.
 
 ![Figure 3: Failure rate (%) by categorical feature value — the blue dashed line marks the overall average failure rate of 19.6%. Bars substantially above or below this line indicate features with predictive signal.](./categorical_failure_rates.png)
@@ -423,7 +423,11 @@ After tuning:
 
 The high standard deviations (±0.08–0.15) reflect that each validation fold contains only ~10 minority-class cases — too few for a stable estimate in any single fold. The cross-validation AUC should be interpreted as showing a direction of difference between models, not as a precise performance estimate.
 
+**Why 0.70 as the clinical target?** An AUC of 0.70 is a widely used convention in clinical prediction modelling for the minimum threshold at which a prognostic model is considered to have adequate discriminatory power to be clinically useful — it means the model correctly ranks 70% of all failure/success patient pairs. Below 0.70, the model's ability to distinguish who will fail from who will succeed is considered too weak to justify its use in clinical decision-making (e.g., for triaging patients to enhanced counselling or closer follow-up). An AUC of 0.50 is a random classifier; 0.70 represents the lower bound of "acceptable" discrimination by convention in surgical outcomes literature (e.g., Hosmer & Lemeshow; Steyerberg et al. *Clinical Prediction Models*).
+
 ![Figure 6: 5-fold CV AUC-ROC for all models and SMOTE variants — blue bars are standard models, red bars are SMOTE-augmented variants, grey is the dummy baseline. The green dotted line marks the 0.70 clinical target.](./cv_auc_comparison.png)
+
+**Reading Figure 6:** All models cluster well below the 0.70 clinical target, with cross-validation AUCs ranging from ~0.46 (Decision Tree) to ~0.60 (LightGBM + SMOTE). No model reaches 0.70 during cross-validation, confirming that this is a genuinely difficult classification task. The SMOTE-augmented variants (red) show a modest improvement for LightGBM but not consistently across all models, suggesting that synthetic oversampling helps partially but does not resolve the fundamental data scarcity in the minority class.
 
 ### 9.2 Test Set Performance (Held-Out, 65 Patients)
 
@@ -443,9 +447,15 @@ The high standard deviations (±0.08–0.15) reflect that each validation fold c
 
 ![Figure 7: ROC curves for all models on the held-out test set — each curve plots sensitivity vs. 1−specificity at every possible threshold. The area under each curve (AUC) is shown in the legend. The dashed diagonal represents a random classifier.](./roc_curves.png)
 
+**Reading Figure 7:** XGBoost's curve (AUC=0.660) bows furthest above the diagonal, confirming it has the best overall ranking ability. Logistic Regression and Decision Tree curves dip below the diagonal at certain threshold regions, reflecting their relatively poor discrimination. The spread of curves between ~0.41 (Decision Tree) and 0.66 (XGBoost) illustrates that model choice meaningfully affects performance even on this small test set.
+
 ![Figure 8: Confusion matrices for the top 4 models (by AUC) at default threshold 0.50 — columns are predicted class, rows are actual class. Note that tree-based models predict zero failures at this threshold due to the class imbalance prior.](./confusion_matrices.png)
 
+**Reading Figure 8:** At the default threshold (0.50), XGBoost, Random Forest, and KNN all predict zero failures — every patient is classified as "success." This is not a model failure; it reflects the 80:20 class imbalance causing the model's probability estimates to stay below 0.50 for most patients. SVM, which uses margin-based decisions less sensitive to probability calibration, shows non-zero sensitivity at this threshold but at the cost of lower AUC. The practical takeaway is that threshold adjustment (see Section 9.3) is essential before these models are usable.
+
 ![Figure 9: Calibration curves for the top 4 models — a perfectly calibrated model follows the dashed diagonal. Deviation above the line means predicted probabilities are underestimated; deviation below means they are overestimated. Well-calibrated models are more reliable for threshold selection.](./calibration_curves.png)
+
+**Reading Figure 9:** Calibration curves assess whether predicted probabilities match observed frequencies — e.g., patients given a 30% failure probability should fail ~30% of the time. XGBoost and Random Forest tend to underestimate failure probability (curves above the diagonal), meaning their raw probability scores are conservative. This is expected with class-imbalanced data and reinforces why the recommended operating threshold (0.15) is much lower than 0.50. A model that underestimates failure probability is particularly risky in a clinical screening context, as patients near the decision boundary receive misleadingly low risk scores.
 
 ### 9.3 Threshold Analysis — XGBoost (Best Model)
 
@@ -472,6 +482,8 @@ At threshold 0.15 on the test set:
 
 ![Figure 10: Threshold analysis for XGBoost (best model) — sensitivity (red), specificity (blue), precision/PPV (green), and F1 (black dashed) plotted against classification threshold from 0.05 to 0.90. The crossover region around 0.10–0.20 represents the practical clinical operating range.](./threshold_analysis.png)
 
+**Reading Figure 10:** As the threshold decreases from 0.90 toward 0.05, sensitivity rises (more failures caught) while specificity falls (more false alarms). At threshold 0.15 — the recommended operating point — the curves are in a region where sensitivity (46%) and specificity (77%) are in reasonable balance for a pre-operative screening tool. Below 0.10, sensitivity gains become marginal while false alarm rates rise steeply. The F1 curve peaks around 0.10–0.15, confirming this region as the practical operating range.
+
 ---
 
 ## 10. Feature Importance and Interpretability
@@ -480,7 +492,7 @@ At threshold 0.15 on the test set:
 
 SHAP (SHapley Additive exPlanations) values quantify each feature's contribution to each individual prediction. The mean |SHAP| across all training patients gives a global importance ranking:
 
-| Rank | Feature | Mean |SHAP| | Literature Support |
+| Rank | Feature | Mean \|SHAP\| | Literature Support |
 |---|---|---|---|
 | 1 | `age_diagnosis` | 0.932 | Partial |
 | 2 | `duration_months` | 0.918 | ✓ Strong |
@@ -498,13 +510,19 @@ SHAP (SHapley Additive exPlanations) values quantify each feature's contribution
 | 14 | `v3` involvement | 0.175 | ✓ Moderate |
 | 15 | `nvc_radiologic` | 0.135 | ✓ Strong |
 
-The two plots below present the same SHAP data in complementary ways:
+The three plots below present the SHAP data in complementary ways:
 
 ![Figure 11: SHAP summary (beeswarm) plot for XGBoost — each dot is one training patient. Position on the x-axis shows the SHAP value (negative = pushes toward success, positive = pushes toward failure). Colour shows the raw feature value (red = high, blue = low). This plot simultaneously conveys importance (vertical ranking) and direction of effect.](./shap_summary_xgb.png)
 
+**Reading Figure 11:** Features are ranked top-to-bottom by mean |SHAP|. For `age_diagnosis` and `duration_months` (top two), the rightward spread of red dots indicates that high values (older age at diagnosis, longer duration) push predictions toward failure. The blue leftward cluster confirms that low values push toward success. For `vessel_intraop_Arterial` (a binary feature), blue dots (arterial compression absent) cluster to the right (failure direction), while red dots (arterial present) cluster to the left — consistent with the EDA finding that arterial-only compression is associated with higher observed failure rates in this dataset. Features with dots clustered near zero (e.g., `nvc_radiologic` at rank 15) contribute little to individual predictions.
+
 ![Figure 12: SHAP feature importance bar plot for XGBoost — mean absolute SHAP value across all training patients, summarising each feature's average contribution magnitude regardless of direction.](./shap_importance_bar.png)
 
+**Reading Figure 12:** The bar lengths represent mean |SHAP| — the average absolute push each feature exerts on individual predictions. `age_diagnosis` (0.932) and `duration_months` (0.918) are dominant, nearly three times as influential as mid-ranked features like `vessel_intraop_Arterial` (0.326). The sharp drop-off after the top 4 features suggests the model relies heavily on a small core of predictors, with the remaining features contributing modest marginal signal.
+
 ![Figure 13: SHAP feature importance bar plot for Random Forest — same metric as Figure 12. Comparing this to Figure 12 reveals which features are robustly important across both tree ensemble methods.](./shap_importance_rf.png)
+
+**Reading Figure 13:** The Random Forest SHAP ranking broadly corroborates XGBoost's, with `duration_months`, `age_diagnosis`, `bmi`, and `age_surgery` again appearing near the top. Features that rank highly in both models (Figures 12 and 13) are the most reliable signals — agreement across independent tree ensemble methods substantially reduces the chance that importance is an artefact of one model's particular structure.
 
 ### 10.2 Interpretation of Top Features
 
@@ -518,7 +536,7 @@ Younger patients tend to have better MVD outcomes. This may reflect:
 - Better overall physiological reserve
 
 #### Arterial Compression Intraoperatively (`vessel_intraop_Arterial`) — Rank 7
-Arterial compression is the most mechanistically "clean" form of NVC: a pulsating artery physically impacting the trigeminal nerve root produces a reproducible injury amenable to surgical correction. **Venous compression** is more often associated with diffuse venous congestion or anatomical variants that are technically more challenging to fully decompress, resulting in worse outcomes.
+`vessel_intraop_Arterial` is an important SHAP predictor, but its direction in this dataset is counterintuitive: arterial-only compression is associated with a *higher* observed failure rate (21.4%) compared to mixed Arterial+Venous (14.0%) or Venous-only (12.9%) compression (see Section 4.3). The conventional clinical hypothesis — that pure arterial compression is the most "surgically addressable" mechanism and should predict better outcomes — is not supported by these data. The most likely explanation is confounding by prevalence: arterial compression is by far the most common intraoperative finding (n=234, 73% of cases) and therefore captures the widest mix of disease severity, whereas the smaller venous and mixed groups may be enriched for patients with unusually clear surgical anatomy. This finding should not be over-interpreted from this retrospective cohort, and prospective studies controlling for NVC severity and surgeon experience are needed to disentangle the relationship.
 
 #### NVC Severity (`nvc_intraop`, `nvc_radiologic`) — Ranks 12, 15
 Higher NVC severity (Grade II–III, defined by the degree of nerve indentation or displacement) correlates with better outcomes — counter-intuitively. The explanation is that higher severity confirms a more definitive anatomical cause that is directly addressable by decompression. Grade I (mere contact without indentation) may represent incidental contact rather than the true pathological cause of TN.
@@ -540,15 +558,19 @@ Features that appear important across multiple models (XGBoost SHAP, Random Fore
 
 ![Figure 14: Permutation importance for XGBoost, Random Forest, and LightGBM (left to right) — each bar shows the mean decrease in AUC-ROC when that feature's values are randomly shuffled on the test set (error bars show ±1 SD across 20 repeats). A large drop means the model relies heavily on that feature; near-zero means the feature contributes little.](./permutation_importance.png)
 
+**Reading Figure 14:** Unlike SHAP (which is computed on training data), permutation importance is computed on the held-out test set, making it a direct measure of out-of-sample predictive contribution. Features with large bars and small error bars are the most reliably important. Comparing across the three panels (XGBoost, Random Forest, LightGBM) shows which features are consistently important regardless of model: those appearing prominently in all three panels have the strongest claim to being genuine predictors rather than model-specific artefacts.
+
 ### 10.4 Logistic Regression Coefficients
 
 Logistic Regression coefficients (after standardisation) provide a linear approximation of feature effects:
 - **Positive coefficients** indicate features associated with higher probability of failure
 - **Negative coefficients** indicate features associated with lower probability of failure (higher likelihood of success)
 
-The top positive coefficients (failure risk) include concomitant pain subtype, longer disease duration, and older age. The top negative coefficients (success factors) include arterial compression and higher NVC severity — consistent with the SHAP analysis.
+The top positive coefficients (failure risk) include longer disease duration and older age. The top negative coefficients (success factors) include higher NVC severity — consistent with the SHAP analysis. Note that coefficient directionality for individual features (e.g., subtype, vessel type) should be interpreted alongside the EDA failure rates in Section 4.3, as the linear model may reflect multivariate adjustment rather than univariate associations.
 
 ![Figure 15: Logistic Regression standardised coefficients (top 20 by absolute magnitude) — red bars indicate positive coefficients (feature increases predicted failure probability), blue bars indicate negative coefficients (feature decreases predicted failure probability). Because features are standardised before fitting, coefficient magnitudes are directly comparable across features.](./lr_coefficients.png)
+
+**Reading Figure 15:** Red bars extending right represent features that increase the predicted probability of failure; blue bars extending left represent protective factors. This linear model provides a complementary, interpretable view to the SHAP analysis — features appearing prominently here and in the SHAP rankings are the most consistently supported predictors. Note that Logistic Regression achieved lower AUC (0.426) than XGBoost on the test set, so these coefficients should be read as a cross-check on directionality rather than as precise effect estimates.
 
 ---
 
@@ -558,7 +580,7 @@ The top positive coefficients (failure risk) include concomitant pain subtype, l
 
 1. **Timing of referral matters:** Duration from diagnosis to surgery is among the top predictors. Earlier surgical referral — before central sensitisation becomes established — may improve outcomes. This finding, if validated prospectively, would argue for lower thresholds for neurosurgical consultation in newly diagnosed TN.
 
-2. **Subtype should be central to surgical counselling:** The categorical distinction between paroxysmal and concomitant-pain TN is clinically important and appears as a predictor in the model. Patients with concomitant background pain should be counselled about lower expected success rates and may benefit from a multidisciplinary pain management approach alongside surgical intervention.
+2. **Subtype should be central to surgical counselling:** The categorical distinction between paroxysmal and concomitant-pain TN is clinically important and appears as a predictor in the model. In this dataset, concomitant pain patients had a slightly lower observed failure rate (16.7%) than paroxysmal patients (20.0%), though the concomitant group is small (n=42) and this difference is not statistically robust. Regardless of direction, subtype-specific outcome counselling is warranted, and patients with concomitant background pain may benefit from a multidisciplinary pain management approach alongside surgical intervention given the broader literature suggesting worse outcomes in atypical TN.
 
 3. **Intraoperative findings are more informative than preoperative imaging:** The SHAP analysis shows that `nvc_intraop` (grade at surgery) is somewhat more informative than `nvc_radiologic` (grade on MRI). This suggests that preoperative imaging, while useful, cannot fully predict the neurovascular anatomy encountered at surgery — reinforcing the importance of experienced surgical judgment.
 
