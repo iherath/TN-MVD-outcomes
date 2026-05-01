@@ -1,17 +1,21 @@
-# Data files — not tracked
-*.csv
-*.xlsx
+# ── Patient data — DO NOT COMMIT ──
+# Raw clinical dataset is governed by the data-use agreement / IRB.
+UpdatedTNMVD.xlsx
+UpdatedTNMVD.csv
+*.xls
 
-# MCD Research file
-MCD Research
-
-# Python / Jupyter
+# ── Python / Jupyter ──
 __pycache__/
 *.pyc
+*.pyo
 .ipynb_checkpoints/
-*.egg-info/
-dist/
-build/
 
-# macOS
+# ── Editor / OS junk ──
 .DS_Store
+.vscode/
+.idea/
+
+# ── Local virtualenvs ──
+.venv/
+venv/
+env/
