@@ -1,0 +1,21 @@
+# ── Patient data — DO NOT COMMIT ──
+# Raw clinical dataset is governed by the data-use agreement / IRB.
+UpdatedTNMVD.xlsx
+UpdatedTNMVD.csv
+*.xls
+
+# ── Python / Jupyter ──
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# ── Editor / OS junk ──
+.DS_Store
+.vscode/
+.idea/
+
+# ── Local virtualenvs ──
+.venv/
+venv/
+env/
